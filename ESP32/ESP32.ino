@@ -5,15 +5,21 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
+#include <HardwareSerial.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_Fingerprint.h>
  
 // --- Componentes ---
 RTC_DS1307 rtc;
+
 #define SCREEN_WIDTH   128
 #define SCREEN_HEIGHT  64
 #define OLED_RESET     -1
 #define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+HardwareSerial mySerial(2);
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 // --- Pines ---
 #define RED_PIN 2
@@ -60,10 +66,22 @@ void setup() {
     for (;;)
       ;
   }
-
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
+
+  // Inicializar lector de huellas
+  mySerial.begin(57600, SERIAL_8N1, 16, 17);
+  finger.begin(57600);
+
+  if (!finger.verifyPassword()) {
+    display.println(F("Error sensor huella :c"));
+    display.display();
+    for (;;)
+      ;
+  }
+
+  // if (finger.emptyDatabase() != FINGERPRINT_OK) Serial.println("Error al formatear sensor");
 
   // Inicializar RTC DS1307
   if (!rtc.begin()) {
@@ -128,19 +146,15 @@ void loop() {
 }
 
 void newUser() {
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println(F("Ingrese ID en serial: "));
-  display.display();
+  int id = buscarIndice();
+  if (id == -1)
+    return;
 
-  while (!Serial.available())
-    ;
-  String bio_id = Serial.readStringUntil('\n');
-  bio_id.trim();
+  if (!registrarHuella(id))
+    return;
 
-  // No tocar
-  if (bio_id.length() == 0)
-    return; 
+    while (Serial.available())
+      Serial.read();
 
   display.clearDisplay();
   display.setCursor(0, 0);
@@ -167,7 +181,7 @@ void newUser() {
   display.println(F("Se inicio el proceso de registro"));
   display.display();
 
-  crearUsuarioHTTP(bio_id, String(route), username);
+  crearUsuarioHTTP(String(id), String(route), username);
 }
 
 void crearUsuarioHTTP(String bio_id, String route, String name) {
@@ -209,18 +223,18 @@ void crearUsuarioHTTP(String bio_id, String route, String name) {
 
 // Leer del puerto serial si hay datos disponibles
 void leer_serial(void) {
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Ingrese id:"));
-  display.display();
-  
-  while (!Serial.available())
-    ;
-  String entradaSerial = Serial.readStringUntil('\n');
-  entradaSerial.trim();
-  
-  if (entradaSerial.length() > 0)
-    process_log(entradaSerial); 
+  int id_encontrado = buscarHuella();
+
+  if (id_encontrado == -1) {
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.println(F("Huella no reconocida"));
+    display.display();
+    delay(2000);
+    return;
+  }
+
+  process_log(String(id_encontrado)); 
 }
 
 // --- Procesamiento de los datos ---
@@ -312,6 +326,9 @@ void enviarPeticionHTTP(Registro user) {
   http.end();
 }
 
+
+// Envia una peticion http get para obtener el nombre de un usuario 
+// a partir de su id (no biometrico)
 String obtener_username(String biometric_id)
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -331,6 +348,68 @@ String obtener_username(String biometric_id)
 
   http.end();
   return name;
+}
+
+// Busca el primer indice vacio de memoria dentro del lector de huellas
+int buscarIndice() {
+  finger.getTemplateCount();
+
+  if (finger.templateCount >= 127)
+    return -1;
+
+  return finger.templateCount + 1;
+}
+
+
+// Registra una huella dentro de la memoria del lector de huellas
+bool registrarHuella(int id) {
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(F("Coloque el dedo"));
+  display.display();
+
+  while (finger.getImage() != FINGERPRINT_OK)
+    ;
+  if (finger.image2Tz(1) != FINGERPRINT_OK) return false;
+
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(F("Quite el dedo"));
+  display.display();
+  delay(2000);
+  while (finger.getImage() != FINGERPRINT_NOFINGER)
+    ;
+
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(F("Coloque el mismo dedo"));
+  display.display();
+
+  while (finger.getImage() != FINGERPRINT_OK)
+    ;
+  if (finger.image2Tz(2) != FINGERPRINT_OK) return false;
+  if (finger.storeModel(id) != FINGERPRINT_OK) return false;
+
+  return true;
+}
+
+// Busca una huella coincidente dentro de la memoria del lector de huellas
+// A partir de una huella recien capturada
+int buscarHuella() {
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println(F("Coloque la huella"));
+  display.display();
+
+  while (finger.getImage() != FINGERPRINT_OK)
+    ;
+  if (finger.image2Tz() != FINGERPRINT_OK) 
+  return -1;
+  
+  if (finger.fingerSearch() == FINGERPRINT_OK)
+    return finger.fingerID;
+
+  return -1;
 }
 
 // --- Ingresa un registro de usuario a la pila ---
