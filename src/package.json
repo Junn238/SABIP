@@ -1,0 +1,26 @@
+{
+  "name": "sabip",
+  "version": "1.0.0",
+  "description": "Sistema de Análisis y Biometría de Pasajeros para la digitalización y automatización del control de acceso y registro de usuarios de transporte privado.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Junn238/SABIP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Junn238/SABIP/issues"
+  },
+  "homepage": "https://github.com/Junn238/SABIP#readme",
+  "dependencies": {
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "firebase": "^12.19.0"
+  }
+}
