@@ -142,6 +142,42 @@ xpress.get('/api/users/route/:route', async (req, res) => {
   res.json(users);
 });
 
+xpress.get('/home', async (req, res) => {
+  const docSnap = await getDocs(collection(db, "users"));
+  let users = [];
+
+  if (docSnap.empty)
+    return res.status(404).json({ error: "No users" });
+  docSnap.forEach((doc) => {
+    users.push(doc.data());
+  });
+  res.write(`
+    <table>
+      <caption>
+        Usuarios del transporte administrado por el sistema SABIP
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Ruta</th>
+        </tr>
+      </thead>
+      <tbody>`);
+  users.forEach((user) => {
+    res.write(`
+      <tr>
+        <td>${user.name}</td>
+        <td>${user.route}</td>
+      </tr>
+      `);
+  })
+  res.write(`
+    </tbody>
+    </table>
+    `);
+  res.end();
+});
+
 // configuracion del servidor
 const hostname = '0.0.0.0';
 const port = 8080;
