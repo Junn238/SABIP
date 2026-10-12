@@ -1,458 +1,261 @@
-#include <SPI.h>
-#include <WiFi.h>
+#include <ArduinoJson.h>
 #include <Wire.h>
 #include <RTClib.h>
+#include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoJson.h>
-#include <Adafruit_GFX.h>
-#include <HardwareSerial.h>
-#include <Adafruit_SSD1306.h>
-#include <Adafruit_Fingerprint.h>
- 
-// --- Componentes ---
-RTC_DS1307 rtc;
 
-#define SCREEN_WIDTH   128
-#define SCREEN_HEIGHT  64
-#define OLED_RESET     -1
-#define SCREEN_ADDRESS 0x3C
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-HardwareSerial mySerial(2);
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
-
-// --- Pines ---
+// --- CONFIGURACIÓN DE PINES Y RED ---
 #define RED_PIN 2
-// #define BUZZER_PIN 4
+#define BUZZER_PIN 4
 
-// --- MACROS auxiliares para la pila ---
-#define STACK_SIZE 32
-#define ST_ERROR   -1
-
-const uint8_t route = 32;
-
-// --- Configuración WiFi / HTTP ---
 // El SSID varia (obviamente)
 const char* ssid = "INFINITUMB9B8";
 // La contraseña tambien
 const char* password = "g53kZGU5pS";
-// Esta tambien
-const char* serverUrl = "http://192.168.1.76:8080"; // Cambia por tu servidor/endpoint
 
-// --- Estructura para almacenar registros de usuario  ---
+// --- URLS DEL SERVIDOR NODE.JS ---
+// Usando la IP de tu servidor
+const char* serverUrl = "http://192.168.1.76:8080/api/log"; 
+const char* statusUrl = "http://192.168.1.76:8080/api/status"; 
+const char* enrollUrl = "http://192.168.1.76:8080/api/enroll";
+
+// El identificador de la ruta para este camión en específico
+const String RUTA_ACTUAL = "ruta_1";
+
+// --- VARIABLES DE CONTROL WEB ---
+String modo_lectura = "abordaje"; // Estado por defecto
+unsigned long ultimoChequeo = 0;
+const unsigned long INTERVALO_CHEQUEO = 5000; // Consultar servidor cada 5 segundos
+
+// --- COMPONENTES GLOBALES ---
+RTC_DS3231 rtc; 
+
+// --- ESTRUCTURA PARA ALMACENAR REGISTROS (OFFLINE) ---
 struct Registro {
-  String date;
-  String biometric_id;
-  String route;
+  String clave;
+  String fecha;
 };
 
-Registro USER_STACK[STACK_SIZE] = {};
+#define STACK_SIZE 50
+#define ST_ERROR -1
+Registro USER_STACK[STACK_SIZE];
 int STACK_POS = 0;
 
-char bufferFecha[25];
-uint8_t choice;
 
 void setup() {
-  Serial.begin(9600);
-
+  Serial.begin(115200);
   pinMode(RED_PIN, OUTPUT);
-  // pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(RED_PIN, LOW);
-  // digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(BUZZER_PIN, LOW);
 
-  // Inicializar pantalla OLED
-  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ;
-  }
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-
-  // Inicializar lector de huellas
-  mySerial.begin(57600, SERIAL_8N1, 16, 17);
-  finger.begin(57600);
-
-  if (!finger.verifyPassword()) {
-    display.println(F("Error sensor huella :c"));
-    display.display();
-    for (;;)
-      ;
-  }
-
-  // if (finger.emptyDatabase() != FINGERPRINT_OK) Serial.println("Error al formatear sensor");
-
-  // Inicializar RTC DS1307
+  // Inicializar I2C y RTC DS3231
   if (!rtc.begin()) {
-    display.println(F("Error: DS3231 module not found"));
-    display.display();
-    for (;;)
-      ;
-  } else if (!rtc.isrunning()) {
-    display.println(F("RTC sad, idk..."));
-    display.display();
-    delay(5000);
+    Serial.println("Error: No se encontró el módulo RTC DS3231");
+  } else if (!rtc.isrunning()) { // Ajustado a lostPower() si usas la libreria moderna, o isrunning() según tu código
+    Serial.println("RTC perdió energía, configurando hora por defecto...");
     // Ajusta el RTC a la fecha y hora de compilación
-    // Actualizando 
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
-  // Descomentar si se desajusta el reloj 
-  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  // DateTime now = rtc.now();
-  // ajustar los segundos entre la compilacion y la escritura del codigo
-  // uint8_t adjust_second = now.second() + 14;
-  // uint8_t adjust_minute = now.minute();
-  // if (adjust_second > 59) {
-  //   adjust_second = adjust_second % 60;
-  //   adjust_minute++;
-  // }
-  // rtc.adjust(DateTime(
-  //   now.year(), now.month(), now.day(),
-  //   now.hour(), adjust_minute, adjust_second
-  // ));
-
-  display.clearDisplay();
-  // Intento opcional de conexión WiFi
+  // Intento de conexión WiFi
   WiFi.begin(ssid, password);
-
-  display.println(F("Ingrese tipo registro"));
-  display.println(F("1. De usuario"));
-  display.println(F("2. De asistencia"));
-  display.display();
-  choice = readnumber();
+  Serial.println("Iniciando ESP32... Conectando a WiFi...");
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConectado a la red WiFi.");
 }
 
 void loop() {
-
-  switch(choice) {
-    case 1: {
-      newUser();
-      break;
-    }
-    case 2: {
-      leer_serial();
-      break;
-    }
-    default: {
-      display.clearDisplay();
-      display.println(F("Opcion no valida :c"));
-      display.display();
-      delay(5000);
-      break;
+  // 1. Consultar estado del servidor periódicamente sin bloquear el ESP32
+  if (millis() - ultimoChequeo >= INTERVALO_CHEQUEO) {
+    ultimoChequeo = millis();
+    if (WiFi.status() == WL_CONNECTED) {
+      consultarEstado();
     }
   }
-  
+
+  // 2. Leer entrada (Simulación por Serial actual o futuro sensor AS608)
+  if (Serial.available() > 0) {
+    String entradaSerial = Serial.readStringUntil('\n');
+    entradaSerial.trim(); // Remover espacios o saltos de línea (\r, \n)
+    
+    if (entradaSerial.length() > 0) {
+      if (modo_lectura == "abordaje") {
+        // Modo normal: Registra el abordaje
+        procesarLectura(entradaSerial);
+      } 
+      else if (modo_lectura == "nueva_huella") {
+        // Modo registro: Enrola la nueva huella y avisa al backend
+        enviarNuevaHuella(entradaSerial);
+        // Retornamos de inmediato a modo normal localmente
+        modo_lectura = "abordaje"; 
+      }
+    }
+  }
 }
 
-void newUser() {
-  int id = buscarIndice();
-  if (id == -1)
-    return;
+// ----------------------------------------------------
+// FUNCIONES DE CONTROL DE ABORDAJE (ORIGINALES)
+// ----------------------------------------------------
 
-  if (!registrarHuella(id))
-    return;
-
-    while (Serial.available())
-      Serial.read();
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println(F("ID capturado"));
-  display.println(F("Ingrese nombre de usuario:"));
-  display.display();
-
-  while (!Serial.available())
-    ;
-  String username = Serial.readStringUntil('\n');
-  username.trim();
-
-  if (username.length() == 0) {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("Nombre invalido");
-    display.display();
-    delay(3000);
-    return;
-  }
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println(F("Se inicio el proceso de registro"));
-  display.display();
-
-  crearUsuarioHTTP(String(id), String(route), username);
-}
-
-void crearUsuarioHTTP(String bio_id, String route, String name) {
-  if (WiFi.status() != WL_CONNECTED) {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("Error: no WiFi"));
-    display.display();
-    delay(3000);
-    return;
-  }
-  HTTPClient http;
-  String url = String(serverUrl) + "/api/users";
-  http.begin(url);
-  http.addHeader("content-Type", "application/json");
-
-  JsonDocument doc;
-  doc["biometric_id"] = bio_id;
-  doc["route"] = route;
-  doc["name"] = name;
-
-  String jsonPayload;
-  serializeJson(doc, jsonPayload);
-  int httpCode = http.POST(jsonPayload);
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-
-  if (httpCode == 201) {
-    display.println("Usuario registrado con exito");
-  } else {
-    Serial.printf("Error HTTP: %d", httpCode);
-    display.println(F("Usuario NO registrado"));
-  }
-  display.display();
-  delay(3000);
-  http.end();
-}
-
-// Leer del puerto serial si hay datos disponibles
-void leer_serial(void) {
-  int id_encontrado = buscarHuella();
-
-  if (id_encontrado == -1) {
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.println(F("Huella no reconocida"));
-    display.display();
-    delay(2000);
-    return;
-  }
-
-  process_log(String(id_encontrado)); 
-}
-
-// --- Procesamiento de los datos ---
-void process_log(String codigo) {
-
+void procesarLectura(String codigo) {
   String user_id = codigo;
-
   DateTime ahora = rtc.now();
+  char bufferFecha[25];
   snprintf(bufferFecha, sizeof(bufferFecha), "%04d-%02d-%02d %02d:%02d:%02d",
-    ahora.year(), ahora.month(), ahora.day(),
-    ahora.hour(), ahora.minute(), ahora.second()
-  );
+           ahora.year(), ahora.month(), ahora.day(),
+           ahora.hour(), ahora.minute(), ahora.second()
+          );
+          
+  Registro registro_auxiliar = { user_id, String(bufferFecha) };
 
-  Registro registro_auxiliar = {
-    String(bufferFecha), user_id, String(route)
-  };
-
-  if (WiFi.status() == WL_CONNECTED)
-    // Intentar enviar petición HTTP POST
-    enviarPeticionHTTP(registro_auxiliar);
-  else
-    // Envia el registro formateado a la pila
+  if (WiFi.status() != WL_CONNECTED) {
+    // Envia el registro formateado a la pila offline
     stack_push(registro_auxiliar);
+  } else if (WiFi.status() == WL_CONNECTED) {
+    // Intentar enviar petición HTTP POST con el registro actual y los de la pila
+    enviarPeticionHTTP(registro_auxiliar);
+  }
 }
 
-// --- Envío de Datos por HTTP POST ---
-void enviarPeticionHTTP(Registro user) {
+void enviarPeticionHTTP(Registro registro_actual) {
+  int heap_index = 0;
   HTTPClient http;
-  String api_endpoint = String(serverUrl) + "/api/log";
-  http.begin(api_endpoint);
+  http.begin(serverUrl);
   http.addHeader("Content-Type", "application/json");
 
   JsonDocument doc;
+  JsonArray arreglo = doc.to<JsonArray>();
+
+  // 1. Añadimos el registro que acaba de suceder
+  JsonObject current_user = arreglo.add<JsonObject>();
+  current_user["biometric_id"] = registro_actual.clave; // Ajustado a biometric_id para el Node.js
+  current_user["date"] = registro_actual.fecha;
+  current_user["route"] = RUTA_ACTUAL; // Añadimos la ruta
+
+  // 2. Vaciamos los registros almacenados en la pila
+  while ((heap_index = stack_pop()) != ST_ERROR) {
+    JsonObject user = arreglo.add<JsonObject>();
+    user["biometric_id"] = USER_STACK[heap_index].clave;
+    user["date"] = USER_STACK[heap_index].fecha;
+    user["route"] = RUTA_ACTUAL;
+  }
+
   String jsonPayload;
-  bool isbatch = false;
-  int load = 0;
-
-  if (STACK_POS > 0) {
-    isbatch = true;
-    JsonArray array = doc.to<JsonArray>();
-
-    JsonObject arr_user = array.add<JsonObject>();
-    arr_user["date"] = user.date;
-    arr_user["biometric_id"] = user.biometric_id;
-    arr_user["route"] = user.route;
-    load++;
-
-    int heap_index;
-    while ((heap_index = stack_pop()) != ST_ERROR) {
-      JsonObject stack_user = array.add<JsonObject>();
-      stack_user["date"] = USER_STACK[heap_index].date;
-      stack_user["biometric_id"] = USER_STACK[heap_index].biometric_id;
-      stack_user["route"] = USER_STACK[heap_index].route;
-      load++;
-    }
-  } else {
-    doc["date"] = user.date;
-    doc["biometric_id"] = user.biometric_id;
-    doc["route"] = user.route;
-  }
-
   serializeJson(doc, jsonPayload);
-  Serial.println("HTTP generado: "+jsonPayload);
 
-  int httpCode = http.POST(jsonPayload);
+  int httpResponseCode = http.POST(jsonPayload);
 
-  display.clearDisplay();
-  display.setCursor(0, 0);
-
-  if (httpCode == 201) {
-    activarAlarma();
-    if (isbatch) {
-      display.println(F("Sincronizacion realizada"));
-      display.printf("%d registros subidos\n", load);
-    } else {
-      String user_name = obtener_username(user.biometric_id);
-      display.println(F("Acceso registrado"));
-      display.println(user.date);
-      display.println(user_name);
-    }
+  if (httpResponseCode == 201) {
+    Serial.println("Registros de abordaje enviados correctamente.");
+    activarAlarma(); // Señal de éxito
   } else {
-    display.clearDisplay();
-    Serial.printf("Error HTTP: %s:\n", http.errorToString(httpCode).c_str());
-    display.println("Error con el servidor");
+    Serial.print("Error al enviar registros. Código: ");
+    Serial.println(httpResponseCode);
+    // Si falla el envío, volvemos a guardar el registro actual en la pila
+    stack_push(registro_actual);
   }
-
-  display.display();
-  delay(3000);
-  http.end();
-}
-
-
-// Envia una peticion http get para obtener el nombre de un usuario 
-// a partir de su id (no biometrico)
-String obtener_username(String biometric_id)
-{
-  if (WiFi.status() != WL_CONNECTED)
-    return "No WiFi";
-
-  HTTPClient http;
-  String url = String(serverUrl) + "/api/users/id/" + biometric_id;
-  http.begin(url);
-
-  int httpCode =http.GET();
-  String name = "NULL";
-
-  if (httpCode == HTTP_CODE_OK || httpCode == 404)
-    name = http.getString();
-  else
-    Serial.printf("Error en GET: %s\n", http.errorToString(httpCode).c_str());
-
-  http.end();
-  return name;
-}
-
-// Busca el primer indice vacio de memoria dentro del lector de huellas
-int buscarIndice() {
-  finger.getTemplateCount();
-
-  if (finger.templateCount >= 127)
-    return -1;
-
-  return finger.templateCount + 1;
-}
-
-
-// Registra una huella dentro de la memoria del lector de huellas
-bool registrarHuella(int id) {
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Coloque el dedo"));
-  display.display();
-
-  while (finger.getImage() != FINGERPRINT_OK)
-    ;
-  if (finger.image2Tz(1) != FINGERPRINT_OK) return false;
-
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Quite el dedo"));
-  display.display();
-  delay(2000);
-  while (finger.getImage() != FINGERPRINT_NOFINGER)
-    ;
-
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Coloque el mismo dedo"));
-  display.display();
-
-  while (finger.getImage() != FINGERPRINT_OK)
-    ;
-  if (finger.image2Tz(2) != FINGERPRINT_OK) return false;
-  if (finger.storeModel(id) != FINGERPRINT_OK) return false;
-
-  return true;
-}
-
-// Busca una huella coincidente dentro de la memoria del lector de huellas
-// A partir de una huella recien capturada
-int buscarHuella() {
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Coloque la huella"));
-  display.display();
-
-  while (finger.getImage() != FINGERPRINT_OK)
-    ;
-  if (finger.image2Tz() != FINGERPRINT_OK) 
-  return -1;
   
-  if (finger.fingerSearch() == FINGERPRINT_OK)
-    return finger.fingerID;
-
-  return -1;
+  http.end();
 }
 
-// --- Ingresa un registro de usuario a la pila ---
-void stack_push(Registro user)
-{
+// ----------------------------------------------------
+// FUNCIONES DE CONTROL WEB (NUEVAS)
+// ----------------------------------------------------
+
+void consultarEstado() {
+  HTTPClient http;
+  http.begin(statusUrl);
+  
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode > 0) {
+    String payload = http.getString();
+    
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    
+    if (!error) {
+      String tipo = doc["tipo_lectura"].as<String>();
+      
+      // Si el servidor web pide registrar huella
+      if (tipo == "nueva_huella" && modo_lectura != "nueva_huella") {
+        modo_lectura = "nueva_huella";
+        Serial.println("MODO REGISTRO ACTIVADO: Esperando nueva huella...");
+        // Alerta de doble parpadeo para el coordinador
+        activarAlarma(); 
+        delay(200);
+        activarAlarma();
+      } 
+      // Si el servidor web pide regresar a monitoreo de abordajes
+      else if (tipo == "abordaje" && modo_lectura != "abordaje") {
+        modo_lectura = "abordaje";
+        Serial.println("Modo normal (Abordaje) restaurado.");
+      }
+    }
+  }
+  http.end();
+}
+
+void enviarNuevaHuella(String nueva_clave) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(enrollUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    JsonDocument doc;
+    doc["biometric_id"] = nueva_clave;
+
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode == 201) {
+      Serial.println("Nueva huella enviada exitosamente para vinculación.");
+      activarAlarma(); 
+    } else {
+      Serial.print("Error al enviar nueva huella. Código: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  } else {
+    Serial.println("Error: Sin conexión Wi-Fi para enrolar la huella.");
+  }
+}
+
+// ----------------------------------------------------
+// FUNCIONES AUXILIARES DE ALARMA Y PILA
+// ----------------------------------------------------
+
+void activarAlarma() {
+  digitalWrite(RED_PIN, HIGH);
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(1000); // Mantiene encendido por 1 segundo
+  digitalWrite(RED_PIN, LOW);
+  digitalWrite(BUZZER_PIN, LOW);
+}
+
+void stack_push(Registro user) {
   if (STACK_POS < STACK_SIZE) {
     activarAlarma();
     USER_STACK[STACK_POS++] = user;
     Serial.println("Registro almacenado en la pila. Conexion a Internet no disponible");
-    // Serial.printf("%2d %s %s\n", (STACK_POS-1), USER_STACK[STACK_POS-1].biometric, USER_STACK[STACK_POS-1].fecha
-  }
-  else {
+  } else {
     Serial.println("Registro no realizado. Pila de usuarios llena");
     activarAlarma();
-    activarAlarma();
+    activarAlarma(); // Doble pitido indicando memoria llena
   }
 }
 
-//  --- Elimina un registro de usuario de la pila ---
-uint8_t stack_pop()
-{
-  if (STACK_POS > 0)
-    return STACK_POS--;
-  else
+int stack_pop() {
+  if (STACK_POS > 0) {
+    return --STACK_POS;
+  } else {
     return ST_ERROR;
-} 
-
-// --- Acción sobre LED y Buzzer ---
-void activarAlarma() {
-  digitalWrite(RED_PIN, HIGH);
-  // digitalWrite(BUZZER_PIN, HIGH);
-  delay(500); // Mantiene encendido por 1 segundo
-  digitalWrite(RED_PIN, LOW);
-  // digitalWrite(BUZZER_PIN, LOW);
-}
-
-uint8_t readnumber(void) {
-  uint8_t num = 0;
-
-  while (num == 0) {
-    while (!Serial.available())
-      ;
-    num = Serial.parseInt();
   }
-  return num;
 }
