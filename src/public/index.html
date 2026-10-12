@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coordinador SABIP</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: #f0f2f5; margin: 0; }
+    .header { text-align: center; margin-bottom: 20px; }
+    
+    /* Botones principales */
+    .btn { background: #0056b3; color: white; padding: 16px 20px; border: none; border-radius: 10px; width: 100%; font-size: 18px; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: pointer; }
+    .btn:active { background: #004494; }
+    .btn-secondary { background: #6c757d; }
+    .btn-danger { background: #dc3545; }
+    .btn-success { background: #28a745; }
+    
+    /* Listas y Tarjetas */
+    .ruta-item, .card { background: white; padding: 16px; border-radius: 10px; margin-bottom: 12px; border-left: 5px solid #0056b3; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
+    .ruta-item:active { background: #e9ecef; }
+    .user-id { font-size: 1.1em; font-weight: bold; color: #333; }
+    .date { font-size: 0.9em; color: #666; margin-top: 5px; }
+
+    /* Control de Vistas */
+    .view { display: none; }
+    .active-view { display: block; }
+    
+    /* Formularios */
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold;}
+    .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Control SABIP</h2>
+  </div>
+
+  <!-- VISTA 0: Pantalla de Login -->
+  <div id="view-login" class="view active-view">
+    <h3>Iniciar Sesión</h3>
+    <div class="form-group">
+        <label>Correo Electrónico:</label>
+        <input type="email" id="input-email" placeholder="usuario@settepi.com">
+    </div>
+    <div class="form-group">
+        <label>Contraseña:</label>
+        <input type="password" id="input-password" placeholder="******">
+    </div>
+    <button id="btn-login" class="btn">Ingresar</button>
+  </div>
+
+  <!-- VISTA 1: Menú Principal -->
+  <div id="view-menu" class="view">
+    <p>Bienvenido, <span id="user-role-display"></span></p>
+    <button id="btn-menu-monitorear" class="btn">Monitorear Rutas</button>
+    
+    <!-- Este botón estará oculto por defecto para los monitores -->
+    <button id="btn-menu-registrar" class="btn btn-secondary" style="display: none;">Registrar Usuarios</button>
+    
+    <button id="btn-logout" class="btn btn-danger" style="margin-top: 20px;">Cerrar Sesión</button>
+  </div>
+
+  <!-- VISTA 2: Lista de Rutas -->
+  <div id="view-rutas" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
+    <h3 id="titulo-rutas">Selecciona una Ruta</h3>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;" id="controles-rutas-admin" style="display: none;">
+        <button id="btn-agregar-ruta" class="btn btn-success" style="width: 50%; padding: 10px; font-size: 14px;">+ Agregar</button>
+        <button id="btn-eliminar-ruta" class="btn btn-danger" style="width: 50%; padding: 10px; font-size: 14px;">- Eliminar</button>
+    </div>
+
+    <div id="lista-rutas">
+        <!-- Las rutas se cargarán aquí dinámicamente o se pueden dejar fijas -->
+        <div class="ruta-item" data-ruta-id="ruta_1">Ruta 1: Apodaca Centro</div>
+        <div class="ruta-item" data-ruta-id="ruta_2">Ruta 2: Escobedo Industrial</div>
+    </div>
+  </div>
+
+  <!-- VISTA 3: Tabla de Registros de Abordaje (Modo Monitoreo) -->
+  <div id="view-registros" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-rutas">⬅ Volver a Rutas</button>
+    <h3 id="titulo-registros-ruta">Registros de Abordaje</h3>
+    <button id="btn-activar-sensor" class="btn" style="display: none;">Activar Sensor de Abordaje</button>
+    <div id="lista-pasajeros">Esperando lecturas...</div>
+  </div>
+
+  <!-- VISTA 4: Formulario de Registro de Usuario (Modo Registro) -->
+  <div id="view-formulario-registro" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-rutas">⬅ Volver a Rutas</button>
+    <h3>Registrar Nuevo Usuario</h3>
+    <p>Ruta seleccionada: <span id="lbl-ruta-registro"></span></p>
+
+    <div class="form-group">
+        <label>Esperando Huella del Sensor (ID_Usuario):</label>
+        <input type="text" id="input-huella-id" placeholder="ID pendiente..." readonly style="background-color: #e9ecef; border-color: #28a745; border-width: 2px;">
+        <button id="btn-pedir-huella" class="btn" style="margin-top: 10px; padding: 10px; font-size: 14px;">Solicitar Ingreso de Huella al Dispositivo</button>
+    </div>
+
+    <div class="form-group">
+        <label>Nombre Completo:</label>
+        <input type="text" id="input-nombre" placeholder="Ingresa el nombre">
+    </div>
+    <div class="form-group">
+        <label>Número de Nómina / Gafete:</label>
+        <input type="text" id="input-nomina" placeholder="Ej. 12345">
+    </div>
+
+    <button id="btn-guardar-usuario" class="btn btn-success">Guardar Usuario en Base de Datos</button>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
