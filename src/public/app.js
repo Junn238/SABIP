@@ -5,9 +5,9 @@ import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from
 // 1. REEMPLAZA ESTO CON LOS DATOS DE TU PROYECTO FIREBASE
 // Son los mismos que pusiste en tu archivo .env para el Node.js
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  projectId: "tu-proyecto",
+  apiKey: "TU_API_KEY", //LO PEGAS O NO FUNCIONARA EL PROYECTO
+  authDomain: "sabip-1953c.firebaseapp.com",
+  projectId: "sabip-1953c",
 };
 
 const app = initializeApp(firebaseConfig);
