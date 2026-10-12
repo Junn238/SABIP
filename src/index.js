@@ -158,16 +158,17 @@ xpress.get('/home', async (req, res) => {
       </caption>
       <thead>
         <tr>
-          <th scope="col">Nombre</th>
           <th scope="col">Ruta</th>
+          <th scope="col">Nombre</th>
         </tr>
       </thead>
       <tbody>`);
   users.forEach((user) => {
+    console.log(user);
     res.write(`
       <tr>
-        <td>${user.name}</td>
         <td>${user.route}</td>
+        <td>${user.name}</td>
       </tr>
       `);
   })
