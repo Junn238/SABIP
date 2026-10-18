@@ -3,7 +3,7 @@ import { getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, onSnaps
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "PEGUEN_LA_LLAVE_AQUI", 
+  apiKey: "LLAVE_API", 
   authDomain: "sabip-1953c.firebaseapp.com",
   projectId: "sabip-1953c",
 };
@@ -59,13 +59,21 @@ onAuthStateChanged(auth, async (user) => {
             
             const btnRutas = document.getElementById('btn-menu-rutas');
             const btnUsuarios = document.getElementById('btn-menu-usuarios');
+            const btnReportes = document.getElementById('btn-menu-reportes');
             
+            // Lógica de permisos por roles
             if (rolActual === "coordinador") {
                 btnRutas.style.display = "block";
                 btnUsuarios.style.display = "block";
+                btnReportes.style.display = "block";
+            } else if (rolActual === "monitor") {
+                btnRutas.style.display = "none";
+                btnUsuarios.style.display = "none";
+                btnReportes.style.display = "block"; 
             } else {
                 btnRutas.style.display = "none";
                 btnUsuarios.style.display = "none";
+                btnReportes.style.display = "none";
             }
             cambiarVista('view-menu');
         } else {
@@ -88,6 +96,11 @@ document.getElementById('btn-menu-usuarios').addEventListener('click', () => {
 document.getElementById('btn-menu-monitorear').addEventListener('click', () => {
     cambiarVista('view-monitoreo');
     iniciarMonitoreo();
+});
+
+document.getElementById('btn-menu-reportes').addEventListener('click', () => {
+    cambiarVista('view-reportes');
+    document.getElementById('lista-reportes').innerHTML = ''; // Limpiar reportes previos
 });
 
 document.querySelectorAll('.btn-ruta-admin').forEach(btn => {
@@ -143,22 +156,32 @@ document.getElementById('select-ruta').addEventListener('change', async (e) => {
     }
 });
 
+// --- LÓGICA DE REGISTRO DE NUEVA HUELLA ---
 document.getElementById('btn-pedir-huella').addEventListener('click', async () => {
-    await setDoc(doc(db, "control_rutas", "estado_actual"), {
-        registro_activo: true,
-        tipo_lectura: "nueva_huella"
-    });
-    alert("Coloca el dedo en el sensor del ESP32...");
-    document.getElementById('input-huella-id').value = "Esperando lectura...";
+    alert("Asegúrate de que el ESP32 esté en Modo 1 (Nuevo usuario) desde el monitor serie. Esperando lectura...");
+    document.getElementById('input-huella-id').value = "Esperando lectura del ESP32...";
 
-    const q = query(collection(db, "nuevas_huellas"), orderBy("timestamp", "desc"), limit(1));
+    // Obtenemos la fecha actual para escuchar SOLAMENTE las huellas que lleguen a partir de este momento
+    const now = new Date();
+    const q = query(
+        collection(db, "nuevas_huellas"), 
+        where("timestamp", ">=", now), 
+        orderBy("timestamp", "desc"), 
+        limit(1)
+    );
     
     if(unsubscribeRegistro) unsubscribeRegistro();
     unsubscribeRegistro = onSnapshot(q, (snapshot) => {
-        if (!snapshot.empty) {
-            const data = snapshot.docs[0].data();
-            if(data.user_id) document.getElementById('input-huella-id').value = data.user_id;
-        }
+        snapshot.docChanges().forEach((change) => {
+            // Solo reaccionamos si se agregó un nuevo documento
+            if (change.type === "added") {
+                const data = change.doc.data();
+                if(data.user_id) {
+                    document.getElementById('input-huella-id').value = data.user_id;
+                    alert("¡Huella detectada exitosamente!");
+                }
+            }
+        });
     });
 });
 
@@ -169,7 +192,7 @@ document.getElementById('btn-guardar-usuario').addEventListener('click', async (
     const ruta = document.getElementById('select-ruta').value;
     const parada = document.getElementById('select-parada').value;
 
-    if(!huellaId || huellaId === "Esperando lectura...") return alert("Falta ingresar la huella desde el ESP32.");
+    if(!huellaId || huellaId === "Esperando lectura del ESP32...") return alert("Falta ingresar la huella desde el ESP32.");
     if(!nombre || !nomina || !ruta || !parada) return alert("Completa todos los campos y selecciones.");
 
     try {
@@ -198,16 +221,7 @@ document.getElementById('btn-guardar-usuario').addEventListener('click', async (
 // --- LÓGICA DE MONITOREO Y PASE DE LISTA AUTOMÁTICO ---
 async function iniciarMonitoreo() {
     const contenedor = document.getElementById('lista-monitoreo');
-    contenedor.innerHTML = '<p style="color:var(--text-muted); font-size:14px;">Activando el ESP32 y descargando lista de pasajeros...</p>';
-    
-    try {
-        await setDoc(doc(db, "control_rutas", "estado_actual"), {
-            registro_activo: true,
-            tipo_lectura: "abordaje" 
-        });
-    } catch(error) {
-        console.error("No se pudo activar el ESP32 en Firebase", error);
-    }
+    contenedor.innerHTML = '<p style="color:var(--text-muted); font-size:14px;">Descargando lista de pasajeros...</p>';
     
     // 1. Descargamos primero el catálogo oficial de paradas para dibujarlas aunque estén vacías
     const pasajerosPorParada = {};
@@ -284,3 +298,119 @@ async function iniciarMonitoreo() {
         });
     });
 }
+
+// --- LÓGICA DE REPORTES DE ASISTENCIA ---
+document.getElementById('btn-generar-reporte').addEventListener('click', async () => {
+    const ruta = document.getElementById('select-ruta-reporte').value;
+    const fechaInicioStr = document.getElementById('input-fecha-inicio').value;
+    const fechaFinStr = document.getElementById('input-fecha-fin').value;
+
+    if(!ruta || !fechaInicioStr || !fechaFinStr) return alert("Completa todos los campos para generar el reporte.");
+
+    // Parsear fechas de forma segura evitando problemas de zona horaria local
+    const [anioInicio, mesInicio, diaInicio] = fechaInicioStr.split('-');
+    const fechaInicio = new Date(anioInicio, mesInicio - 1, diaInicio);
+    
+    const [anioFin, mesFin, diaFin] = fechaFinStr.split('-');
+    const fechaFin = new Date(anioFin, mesFin - 1, diaFin);
+
+    if(fechaInicio > fechaFin) return alert("La fecha de inicio debe ser anterior o igual a la fecha de fin.");
+
+    const contenedor = document.getElementById('lista-reportes');
+    contenedor.innerHTML = '<p style="color:var(--text-muted); font-size:14px;">Calculando inasistencias en base de datos...</p>';
+
+    try {
+        // 1. Obtener todos los días válidos en el rango (excluyendo domingos)
+        const diasValidos = [];
+        let fechaActual = new Date(fechaInicio);
+        
+        while(fechaActual <= fechaFin) {
+            if(fechaActual.getDay() !== 0) { // 0 corresponde al domingo en JavaScript
+                const anio = fechaActual.getFullYear();
+                const mes = String(fechaActual.getMonth() + 1).padStart(2, '0');
+                const dia = String(fechaActual.getDate()).padStart(2, '0');
+                diasValidos.push(`${anio}-${mes}-${dia}`); // Formato: YYYY-MM-DD
+            }
+            fechaActual.setDate(fechaActual.getDate() + 1);
+        }
+
+        if(diasValidos.length === 0) {
+            contenedor.innerHTML = '<div class="sin-pasajeros">El rango seleccionado solo contiene domingos. Intenta otro rango.</div>';
+            return;
+        }
+
+        // 2. Obtener lista de usuarios vinculados a la ruta seleccionada
+        const qUsers = query(collection(db, "users"), where("route", "==", ruta));
+        const snapUsers = await getDocs(qUsers);
+        
+        const usuarios = {};
+        snapUsers.forEach(doc => {
+            const u = doc.data();
+            usuarios[doc.id] = { 
+                nombre: u.name, 
+                nomina: u.nomina, 
+                asistenciasDetectadas: new Set(),
+                faltasTotales: [] 
+            };
+        });
+
+        if (Object.keys(usuarios).length === 0) {
+            contenedor.innerHTML = '<div class="sin-pasajeros">No hay pasajeros registrados en esta ruta.</div>';
+            return;
+        }
+
+        // 3. Descargar el log de abordajes de esa ruta
+        const qLog = query(collection(db, "log"), where("route", "==", ruta));
+        const snapLog = await getDocs(qLog);
+        
+        snapLog.forEach(docLog => {
+            // El ID del documento del log viene del ESP32 RTC, formato: "YYYY-MM-DD HH:MM:SS"
+            const idDoc = docLog.id; 
+            const fechaLog = idDoc.split(" ")[0]; // Extraemos solo el "YYYY-MM-DD"
+            const bioId = docLog.data().biometric_id;
+
+            // Si el log ocurrió en un día válido y el usuario existe, registramos su asistencia
+            if(diasValidos.includes(fechaLog) && usuarios[bioId]) {
+                usuarios[bioId].asistenciasDetectadas.add(fechaLog);
+            }
+        });
+
+        // 4. Calcular faltas cruzando los días laborables vs las asistencias del usuario
+        let htmlResultado = '';
+        for(const bioId in usuarios) {
+            const u = usuarios[bioId];
+            
+            diasValidos.forEach(dia => {
+                if(!u.asistenciasDetectadas.has(dia)) {
+                    u.faltasTotales.push(dia);
+                }
+            });
+
+            // 5. Construir y dibujar la tarjeta del usuario
+            const colorBorde = u.faltasTotales.length > 0 ? 'var(--danger)' : 'var(--success)';
+            const claseEstado = u.faltasTotales.length > 0 ? 'sin-abordar' : 'abordo';
+            
+            htmlResultado += `
+                <div class="card" style="border-left: 5px solid ${colorBorde};">
+                    <div class="user-name">
+                        ${u.nombre} (Nómina: ${u.nomina})
+                        <span class="estado ${claseEstado}">
+                            Faltas: ${u.faltasTotales.length}
+                        </span>
+                    </div>
+                    <div class="date" style="margin-top: 10px;">
+                        ${u.faltasTotales.length > 0 
+                            ? `<strong>Días de inasistencia detectados:</strong><br>${u.faltasTotales.join(', ')}` 
+                            : `<em>Asistencia perfecta durante el periodo consultado.</em>`}
+                    </div>
+                </div>
+            `;
+        }
+
+        contenedor.innerHTML = htmlResultado;
+
+    } catch(e) {
+        console.error("Error al procesar el reporte:", e);
+        contenedor.innerHTML = '<div class="sin-pasajeros" style="color:var(--danger); border-color:var(--danger);">Ocurrió un error al procesar la base de datos.</div>';
+    }
+});

@@ -40,6 +40,15 @@
       margin-bottom: 25px;
     }
 
+    /* Estilos para el logo de la empresa */
+    .logo-empresa {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+
     .header h2 { 
       margin: 0; 
       font-size: 22px; 
@@ -204,6 +213,7 @@
 </head>
 <body>
   <div class="header">
+    <img src="logo.png" alt="Logo Settepi" class="logo-empresa">
     <h2>Control SABIP</h2>
   </div>
 
@@ -225,6 +235,7 @@
     <button id="btn-menu-monitorear" class="btn">Monitorear Rutas</button>
     <button id="btn-menu-rutas" class="btn btn-secondary" style="display: none;">Administrar Rutas</button>
     <button id="btn-menu-usuarios" class="btn btn-secondary" style="display: none;">Asignar Usuarios</button>
+    <button id="btn-menu-reportes" class="btn btn-secondary" style="display: none;">Reporte de Asistencias</button>
     <button id="btn-logout" class="btn btn-danger" style="margin-top: 20px;">Cerrar Sesión</button>
   </div>
 
@@ -258,7 +269,7 @@
     <div class="form-group">
         <label>Esperando Huella del Sensor (ID_Usuario):</label>
         <input type="text" id="input-huella-id" placeholder="ID pendiente..." readonly style="background-color: #e9ecef; border-color: var(--success); border-width: 2px;">
-        <button id="btn-pedir-huella" class="btn btn-secondary" style="margin-top: 10px; padding: 10px; font-size: 14px;">Solicitar Ingreso de Huella al Dispositivo</button>
+        <button id="btn-pedir-huella" class="btn btn-secondary" style="margin-top: 10px; padding: 10px; font-size: 14px;">Empezar a escuchar nueva huella</button>
     </div>
     <div class="form-group">
         <label>Nombre Completo:</label>
@@ -266,7 +277,6 @@
     </div>
     <div class="form-group">
         <label>Número de Nómina / Gafete:</label>
-        <!-- Actualizado a valores alfanuméricos -->
         <input type="text" id="input-nomina" placeholder="Ej. EMP-12345">
     </div>
     <div class="form-group">
@@ -290,6 +300,32 @@
     <h3>Monitoreo en Tiempo Real</h3>
     <div id="lista-monitoreo">
         <p style="color:var(--text-muted); font-size:14px;">Sincronizando con la base de datos...</p>
+    </div>
+  </div>
+
+  <div id="view-reportes" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
+    <h3>Reportes de Asistencia</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Consulta las inasistencias en un periodo (excluye domingos).</p>
+    
+    <div class="form-group">
+        <label>Ruta:</label>
+        <select id="select-ruta-reporte">
+            <option value="">Selecciona una ruta...</option>
+            <option value="Ruta 32">Ruta 32</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Fecha de Inicio:</label>
+        <input type="date" id="input-fecha-inicio">
+    </div>
+    <div class="form-group">
+        <label>Fecha de Fin:</label>
+        <input type="date" id="input-fecha-fin">
+    </div>
+    <button id="btn-generar-reporte" class="btn btn-success">Generar Reporte</button>
+
+    <div id="lista-reportes" style="margin-top: 20px;">
     </div>
   </div>
 
