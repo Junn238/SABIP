@@ -191,50 +191,9 @@ xpress.get('/api/users/route/:route', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-xpress.get('/home', async (req, res) => {
-  const docSnap = await getDocs(collection(db, "users"));
-  let users = [];
-
-  if (docSnap.empty)
-    return res.status(404).json({ error: "No users" });
-  docSnap.forEach((doc) => {
-    users.push(doc.data());
-  });
-  res.write(`
-    <table>
-      <caption>
-        Usuarios del transporte administrado por el sistema SABIP
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">Ruta</th>
-          <th scope="col">Nombre</th>
-        </tr>
-      </thead>
-      <tbody>`);
-  users.forEach((user) => {
-    console.log(user);
-    res.write(`
-      <tr>
-        <td>${user.route}</td>
-        <td>${user.name}</td>
-      </tr>
-      `);
-  })
-  res.write(`
-    </tbody>
-    </table>
-    `);
-  res.end();
-});
-
-// configuracion del servidor
-=======
 // ------------------------------------------------
 // INICIO DEL SERVIDOR
 // ------------------------------------------------
->>>>>>> probando_web
 const hostname = '0.0.0.0';
 const port = process.env.PORT || 8080; 
 
