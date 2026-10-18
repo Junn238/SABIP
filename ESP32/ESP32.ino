@@ -8,7 +8,7 @@
 #include <HardwareSerial.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_Fingerprint.h>
- 
+
 // --- Componentes ---
 RTC_DS1307 rtc;
 
@@ -29,7 +29,6 @@ Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 #define ST_ERROR   -1
 
 // --- Configuración WiFi / HTTP ---
-// Hay que dejar de leakear mi red de Internet
 const char* ssid = "INFINITUMB9B8";
 const char* password = "g53kZGU5pS";
 // Para el servidor puede variar la ip, pero el puerto siempre es el mismo
@@ -81,7 +80,7 @@ void setup() {
   // Usar con precaucion
 
   /*
-    if (finger.emptyDatabase() != FINGERPRINT_OK) 
+    if (finger.emptyDatabase() != FINGERPRINT_OK)
       Serial.println("Error al formatear sensor");
   */
 
@@ -140,11 +139,11 @@ void loop() {
       break;
     }
   }
-  
+
 }
 
 // --- Registro de datos para nuevo usuario ---
-void newUser() 
+void newUser()
 {
   int id = buscarIndice();
   if (id == -1)
@@ -159,7 +158,7 @@ void newUser()
 }
 
 // --- Generacion de usuario mediante HTTP POST ---
-void crearUsuarioHTTP(String bio_id) 
+void crearUsuarioHTTP(String bio_id)
 {
   if (WiFi.status() != WL_CONNECTED) {
     display_text("Error: no WiFi");
@@ -190,7 +189,7 @@ void crearUsuarioHTTP(String bio_id)
 }
 
 // --- Obtencion de datos mediante puerto Serial ---
-void leer_serial(void) 
+void leer_serial(void)
 {
   int id_encontrado = buscarHuella();
 
@@ -200,11 +199,11 @@ void leer_serial(void)
     return;
   }
 
-  process_log(String(id_encontrado)); 
+  process_log(String(id_encontrado));
 }
 
 // --- Procesamiento de asistencias de usuario / creacion de log ---
-void process_log(String codigo) 
+void process_log(String codigo)
 {
   String user_id = codigo;
 
@@ -227,7 +226,7 @@ void process_log(String codigo)
 }
 
 // --- Envío de Datos por HTTP POST ---
-void enviarPeticionHTTP(Registro user) 
+void enviarPeticionHTTP(Registro user)
 {
   HTTPClient http;
   String api_endpoint = String(serverUrl) + "/api/log";
@@ -322,7 +321,7 @@ String obtener_username(String biometric_id)
 }
 
 // --- Busqueda de espacio disponible en sensor ---
-int buscarIndice() 
+int buscarIndice()
 {
   finger.getTemplateCount();
 
@@ -333,7 +332,7 @@ int buscarIndice()
 }
 
 // --- Creacion de imagen de huella (sensor) ---
-bool registrarHuella(int id) 
+bool registrarHuella(int id)
 {
   display_text("Coloque el dedo");
   while (finger.getImage() != FINGERPRINT_OK) ;
@@ -357,15 +356,15 @@ bool registrarHuella(int id)
 
 
 // --- Busqueda de huella en memoria (sensor) ---
-int buscarHuella() 
+int buscarHuella()
 {
   display_text("Coloque la huella");
 
   while (finger.getImage() != FINGERPRINT_OK)
     ;
-  if (finger.image2Tz() != FINGERPRINT_OK) 
+  if (finger.image2Tz() != FINGERPRINT_OK)
   return -1;
-  
+
   if (finger.fingerSearch() == FINGERPRINT_OK)
     return finger.fingerID;
 
@@ -391,10 +390,10 @@ uint8_t stack_pop()
     return STACK_POS--;
   else
     return ST_ERROR;
-} 
+}
 
 // --- Acción sobre LED y Buzzer ---
-void activarAlarma() 
+void activarAlarma()
 {
   digitalWrite(RED_PIN, HIGH);
   delay(500); // Mantiene encendido por 500 ms
@@ -402,7 +401,7 @@ void activarAlarma()
 }
 
 // --- Obtencion de numeros mediante puerto serial ---
-uint8_t readnumber(void) 
+uint8_t readnumber(void)
 {
   uint8_t num = 0;
 
