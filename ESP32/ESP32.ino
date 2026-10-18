@@ -25,7 +25,7 @@ Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 #define RED_PIN 2
 
 // --- MACROS auxiliares para la pila ---
-#define STACK_SIZE 32
+#define STACK_SIZE 48
 #define ST_ERROR   -1
 
 // --- Configuración WiFi / HTTP ---
@@ -46,7 +46,7 @@ struct Registro {
 Registro USER_STACK[STACK_SIZE] = {};
 int STACK_POS = 0;
 
-// --- variables globales y definiciones auxiliares
+// --- variables globales y definiciones auxiliares ---
 const String route = "ruta 32";
 char bufferFecha[25];
 #define REGISTER 0
@@ -56,7 +56,6 @@ uint8_t choice;
 
 void setup() {
   Serial.begin(9600);
-
   pinMode(RED_PIN, OUTPUT);
   digitalWrite(RED_PIN, LOW);
 
@@ -153,28 +152,13 @@ void newUser()
   if (!registrarHuella(id))
     return;
 
-    while (Serial.available())
-      Serial.read();
-
-  display_text("ID capturado\nIngrese nombre usuario:");
-
-  while (!Serial.available())
-    ;
-  String username = Serial.readStringUntil('\n');
-  username.trim();
-
-  if (username.length() == 0) {
-    display_text("Nombre invalido");
-    delay(3000);
-    return;
-  }
-
-  display_text("Registro iniciado");
-  crearUsuarioHTTP(String(id), String(route), username);
+  display_text("ID capturado");
+  delay(1000);
+  crearUsuarioHTTP(String(id));
 }
 
 // --- Generacion de usuario mediante HTTP POST ---
-void crearUsuarioHTTP(String bio_id, String route, String name) 
+void crearUsuarioHTTP(String bio_id) 
 {
   if (WiFi.status() != WL_CONNECTED) {
     display_text("Error: no WiFi");
@@ -182,24 +166,23 @@ void crearUsuarioHTTP(String bio_id, String route, String name)
     return;
   }
   HTTPClient http;
-  String url = String(serverUrl) + "/api/users";
+  String url = String(serverUrl) + "/api/enroll";
   http.begin(url);
   http.addHeader("content-Type", "application/json");
 
   JsonDocument doc;
   doc["biometric_id"] = bio_id;
-  doc["route"] = route;
-  doc["name"] = name;
 
   String jsonPayload;
   serializeJson(doc, jsonPayload);
   int httpCode = http.POST(jsonPayload);
 
   if (httpCode == 201) {
-    display_text("Usuario registrado");
+    display_text("Huella enviada a\nvinculacion");
+    activarAlarma();
   } else {
     Serial.printf("Error HTTP: %d", httpCode);
-    display_text("Usuario NO registrado");
+    display_text("Error de vinculacion");
   }
   delay(3000);
   http.end();
@@ -222,7 +205,6 @@ void leer_serial(void)
 // --- Procesamiento de asistencias de usuario / creacion de log ---
 void process_log(String codigo) 
 {
-
   String user_id = codigo;
 
   DateTime ahora = rtc.now();
@@ -254,6 +236,7 @@ void enviarPeticionHTTP(Registro user)
   JsonDocument doc;
   String jsonPayload;
   bool isbatch = false;
+  int stack_start = STACK_POS;
   int load = 0;
 
   if (STACK_POS > 0) {
@@ -302,6 +285,12 @@ void enviarPeticionHTTP(Registro user)
   } else {
     Serial.printf("Error HTTP: %s:\n", http.errorToString(httpCode).c_str());
     display.println("Error con el servidor");
+    display.println("Registro almacenado en stack");
+    // revertir stack_pop realizados actualizando el indice
+    STACK_POS = stack_start;
+    // subir usuario al stack
+    stack_push(user);
+
   }
 
   display.display();
