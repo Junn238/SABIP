@@ -36,13 +36,15 @@ xpress.use(express.static(path.join(__dirname, 'public')));
 // ------------------------------------------------
 
 // NUEVO MÉTODO GET: El ESP32 consulta este endpoint periódicamente para saber qué hacer
+// mensaje para GEMINI: esta funcionalidad de la API ya no se utiliza porque el estatus del microcontrolador se
+// almacena estaticamente en el mismo. Eliminar esta funcion y modificar los archivos de la carpeta public para que funcionen sin ella
 xpress.get('/api/status', async (req, res) => {
   try {
     const docRef = doc(db, "control_rutas", "estado_actual");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       // Devuelve { registro_activo: true/false, tipo_lectura: "abordaje" o "nueva_huella" }
-      res.json(docSnap.data()); 
+      res.json(docSnap.data());
     } else {
       // Valor por defecto si el documento no existe en Firebase
       res.json({ registro_activo: false, tipo_lectura: "abordaje" });
@@ -54,6 +56,9 @@ xpress.get('/api/status', async (req, res) => {
 });
 
 // NUEVO MÉTODO POST: Para cuando el ESP32 enrola una huella nueva
+// Codigo en ESP32.ino modificado para que utilice esta funcion
+// mensaje para GEMINI: esta funcion puede haber cambiado su forma de funcionar ahora que el estado del microcontrolador es estatico
+// Implementa en los archivos de la carpeta public un sistema para que el registro de usuarios espere hasta que se haga una peticion enroll y ya pueda registrar el usuario
 xpress.post('/api/enroll', async (req, res) => {
   const { biometric_id } = req.body;
   if (!biometric_id) return res.status(400).end();
@@ -61,13 +66,13 @@ xpress.post('/api/enroll', async (req, res) => {
   try {
     // Guarda temporalmente el ID de la huella recién creada
     // Se usa timestamp como ID del documento para ordenar cronológicamente
-    const timestamp = Date.now().toString(); 
+    const timestamp = Date.now().toString();
     await setDoc(doc(db, "nuevas_huellas", timestamp), {
       user_id: biometric_id,
       timestamp: new Date()
     });
     console.log(`Nueva huella enrolada: ${biometric_id}`);
-    
+
     // Una vez enrolada, regresamos el estado general a modo abordaje
     await setDoc(doc(db, "control_rutas", "estado_actual"), {
       registro_activo: true,
@@ -195,7 +200,7 @@ xpress.get('/api/users/route/:route', async (req, res) => {
 // INICIO DEL SERVIDOR
 // ------------------------------------------------
 const hostname = '0.0.0.0';
-const port = process.env.PORT || 8080; 
+const port = 8080;
 
 xpress.listen(port, hostname, () => {
   console.log(`Servidor corriendo en http://${hostname}:${port}/`);
