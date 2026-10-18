@@ -29,6 +29,7 @@ Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 #define ST_ERROR   -1
 
 // --- Configuración WiFi / HTTP ---
+// Hay que dejar de leakear mi red de Internet
 const char* ssid = "INFINITUMB9B8";
 const char* password = "g53kZGU5pS";
 // Para el servidor puede variar la ip, pero el puerto siempre es el mismo
