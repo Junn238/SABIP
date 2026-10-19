@@ -22,7 +22,8 @@ HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 // --- Pines ---
-#define RED_PIN 2
+#define    RED_PIN 2
+#define SIGNAL_PIN 4
 
 // --- MACROS auxiliares para la pila ---
 #define STACK_SIZE 48
@@ -47,17 +48,29 @@ Registro USER_STACK[STACK_SIZE] = {};
 int STACK_POS = 0;
 
 // --- variables globales y definiciones auxiliares ---
-const String route = "ruta 32";
+const String route = "Ruta_32";
 char bufferFecha[25];
-#define REGISTER 0
-#define NEW_USER 1
-uint8_t choice;
+
+enum SysMode {
+  REGISTER,
+  NEW_USER
+};
+
+SysMode mode = REGISTER;
+volatile bool needChange = false;
+
+void IRAM_ATTR detectSignal() {
+  needChange = true;
+}
 
 
 void setup() {
   Serial.begin(9600);
   pinMode(RED_PIN, OUTPUT);
+  pinMode(SIGNAL_PIN, INPUT_PULLUP);
   digitalWrite(RED_PIN, LOW);
+
+  attachInterrupt(digitalPinToInterrupt(SIGNAL_PIN), detectSignal, FALLING);
 
   // Inicializar pantalla OLED
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -118,28 +131,32 @@ void setup() {
   WiFi.begin(ssid, password);
 
   // Modo predeterminado del sistema (registro de usuarios)
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println("Seleccionar modo:");
-  display.println("0. Registro asistencia");
-  display.println("1. Nuevo usuario");
-  choice = readnumber();
+  display_text("Modo inicial: lectura\n\nPresione boton para registrar usuario");
+  delay(3000);
 }
 
 void loop() {
-
-  switch(choice) {
-    case REGISTER: { leer_serial(); break; }
-
-    case NEW_USER: {    newUser(); break; }
-
-    default: {
-      display_text("Opcion invalida");
-      delay(5000);
-      break;
-    }
+  switch (mode) {
+    case REGISTER: {leer_serial(); break;}
+    case NEW_USER: {    newUser(); break;}
   }
 
+  if (needChange) {
+    delay(50);
+    if (digitalRead(SIGNAL_PIN) == LOW)
+      nextMode();
+    
+    needChange = false;
+  }
+}
+
+// --- intercambia el modo actual del sistema ---
+void nextMode()
+{
+  if (mode == REGISTER)
+    mode = NEW_USER;
+  else if (mode == NEW_USER)
+    mode = REGISTER;
 }
 
 // --- Registro de datos para nuevo usuario ---

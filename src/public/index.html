@@ -19,21 +19,21 @@
       --text-muted: #6B7280;  /* Texto secundario */
     }
 
-    body { 
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-      background-color: var(--bg-color); 
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
       color: var(--text-main);
-      margin: 0; 
-      padding: 0; 
+      margin: 0;
+      padding: 0;
       -webkit-font-smoothing: antialiased;
     }
 
     /* App Bar Superior */
-    .header { 
-      background-color: var(--primary); 
-      color: white; 
-      padding: 20px; 
-      text-align: center; 
+    .header {
+      background-color: var(--primary);
+      color: white;
+      padding: 20px;
+      text-align: center;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       border-bottom-left-radius: 20px;
       border-bottom-right-radius: 20px;
@@ -49,23 +49,23 @@
       display: inline-block;
     }
 
-    .header h2 { 
-      margin: 0; 
-      font-size: 22px; 
-      font-weight: 700; 
-      letter-spacing: 0.5px; 
+    .header h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
     }
 
     /* Contenedor de Vistas y Animación */
-    .view { 
-      display: none; 
-      padding: 0 20px 30px; 
-      max-width: 600px; 
-      margin: 0 auto; 
+    .view {
+      display: none;
+      padding: 0 20px 30px;
+      max-width: 600px;
+      margin: 0 auto;
     }
-    .active-view { 
-      display: block; 
-      animation: fadeIn 0.3s ease-out; 
+    .active-view {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
     }
 
     @keyframes fadeIn {
@@ -76,25 +76,25 @@
     h3 { margin-top: 0; color: var(--primary); font-size: 20px; font-weight: 800; }
 
     /* Botones Modernos */
-    .btn { 
-      background: var(--primary); 
-      color: white; 
-      padding: 16px 20px; 
-      border: none; 
-      border-radius: 12px; 
-      width: 100%; 
-      font-size: 16px; 
-      font-weight: 600; 
-      margin-bottom: 12px; 
-      box-shadow: 0 4px 6px rgba(10, 37, 64, 0.15); 
-      cursor: pointer; 
-      transition: all 0.2s ease; 
+    .btn {
+      background: var(--primary);
+      color: white;
+      padding: 16px 20px;
+      border: none;
+      border-radius: 12px;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 6px rgba(10, 37, 64, 0.15);
+      cursor: pointer;
+      transition: all 0.2s ease;
     }
 
-    .btn:hover { 
-      background: var(--primary-light); 
-      transform: translateY(-2px); 
-      box-shadow: 0 6px 12px rgba(10, 37, 64, 0.2); 
+    .btn:hover {
+      background: var(--primary-light);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(10, 37, 64, 0.2);
     }
     .btn:active { transform: translateY(0); scale: 0.98; }
 
@@ -107,31 +107,31 @@
     .btn-success { background: var(--success); color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15); }
     .btn-success:hover { background: #059669; }
 
-    .btn-volver { 
-      width: auto; 
-      display: inline-block; 
-      padding: 10px 16px; 
-      font-size: 14px; 
-      margin-bottom: 25px; 
+    .btn-volver {
+      width: auto;
+      display: inline-block;
+      padding: 10px 16px;
+      font-size: 14px;
+      margin-bottom: 25px;
       border-radius: 8px;
     }
 
     /* Formularios Elegantes */
     .form-group { margin-bottom: 18px; }
-    .form-group label { 
-      display: block; 
-      margin-bottom: 8px; 
-      font-weight: 600; 
-      color: var(--primary-light); 
-      font-size: 14px; 
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--primary-light);
+      font-size: 14px;
     }
-    .form-group input, .form-group select { 
-      width: 100%; 
-      padding: 14px; 
-      border: 1.5px solid #D1D5DB; 
-      border-radius: 10px; 
-      box-sizing: border-box; 
-      font-size: 15px; 
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 14px;
+      border: 1.5px solid #D1D5DB;
+      border-radius: 10px;
+      box-sizing: border-box;
+      font-size: 15px;
       background-color: var(--surface);
       color: var(--text-main);
       transition: all 0.2s ease;
@@ -143,26 +143,26 @@
     }
 
     /* Tarjetas de Pasajeros */
-    .card { 
-      background: var(--surface); 
-      padding: 18px 20px; 
-      border-radius: 12px; 
-      margin-bottom: 12px; 
-      border-left: 5px solid var(--primary); 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04); 
+    .card {
+      background: var(--surface);
+      padding: 18px 20px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      border-left: 5px solid var(--primary);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .card:hover {
       transform: translateX(4px);
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
-    .user-name { 
-      font-size: 15px; 
-      font-weight: 700; 
-      color: var(--text-main); 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
+    .user-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     .date { font-size: 13px; color: var(--text-muted); margin-top: 8px; font-family: monospace; }
 
@@ -192,22 +192,22 @@
     }
 
     /* Badges de Estado ("Sin abordar" / "✓ Abordó") */
-    .estado { 
-      padding: 6px 12px; 
-      border-radius: 20px; 
-      font-size: 12px; 
-      font-weight: 700; 
-      letter-spacing: 0.3px; 
+    .estado {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
     }
-    .sin-abordar { 
-      color: #9F1239; 
-      background-color: #FFE4E6; 
-      border: 1px solid #FECDD3; 
+    .sin-abordar {
+      color: #9F1239;
+      background-color: #FFE4E6;
+      border: 1px solid #FECDD3;
     }
-    .abordo { 
-      color: #065F46; 
-      background-color: #D1FAE5; 
-      border: 1px solid #A7F3D0; 
+    .abordo {
+      color: #065F46;
+      background-color: #D1FAE5;
+      border: 1px solid #A7F3D0;
     }
   </style>
 </head>
@@ -307,12 +307,13 @@
     <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
     <h3>Reportes de Asistencia</h3>
     <p style="color:var(--text-muted); font-size:14px;">Consulta las inasistencias en un periodo (excluye domingos).</p>
-    
+
     <div class="form-group">
         <label>Ruta:</label>
         <select id="select-ruta-reporte">
             <option value="">Selecciona una ruta...</option>
             <option value="Ruta 32">Ruta 32</option>
+            <option value="32">32</option>
         </select>
     </div>
     <div class="form-group">

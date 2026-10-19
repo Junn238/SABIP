@@ -11,7 +11,7 @@ const firebaseConfig = {
   authDomain: process.env.AUTH_DOMAIN,
   projectId: process.env.PROJECT_ID,
   storageBucket: process.env.STORAGE_BUCKET,
-  messagingSenderId: process.env.MSSG_SENDER_ID, 
+  messagingSenderId: process.env.MSSG_SENDER_ID,
   appId: process.env.APP_ID,
 };
 
@@ -172,8 +172,6 @@ xpress.get('/api/users/route/:route', async (req, res) => {
 // ------------------------------------------------
 const hostname = '0.0.0.0';
 const port = 8080;
-
 xpress.listen(port, hostname, () => {
   console.log(`Servidor corriendo en http://${hostname}:${port}/`);
-  console.log(`PWA disponible en http://${hostname}:${port}/`);
 });
