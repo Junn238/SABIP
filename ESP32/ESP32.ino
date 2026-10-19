@@ -131,7 +131,7 @@ void setup() {
   WiFi.begin(ssid, password);
 
   // Modo predeterminado del sistema (registro de usuarios)
-  display_text("Modo inicial: lectura\n\nPresione boton para registrar usuario");
+  display_text("Modo inicial: lectura\n\nPresione boton para\nregistrar usuario");
   delay(3000);
 }
 
@@ -141,11 +141,9 @@ void loop() {
     case NEW_USER: {    newUser(); break;}
   }
 
-  if (needChange) {
+  if (needChange == true) {
     delay(50);
-    if (digitalRead(SIGNAL_PIN) == LOW)
-      nextMode();
-    
+    nextMode();
     needChange = false;
   }
 }
@@ -153,10 +151,16 @@ void loop() {
 // --- intercambia el modo actual del sistema ---
 void nextMode()
 {
-  if (mode == REGISTER)
+  if (mode == REGISTER) {
+    display_text("Cambio a modo registro");
+    delay(1500);
     mode = NEW_USER;
-  else if (mode == NEW_USER)
+  }
+  else if (mode == NEW_USER) {
+    display_text("Cambio a modo asistencia");
+    delay(1500);
     mode = REGISTER;
+  }
 }
 
 // --- Registro de datos para nuevo usuario ---
@@ -352,16 +356,25 @@ int buscarIndice()
 bool registrarHuella(int id)
 {
   display_text("Coloque el dedo");
-  while (finger.getImage() != FINGERPRINT_OK) ;
+  while (finger.getImage() != FINGERPRINT_OK) {
+    if (needChange)
+      return false;
+  }
   // Imagen no creada
   if (finger.image2Tz(1) != FINGERPRINT_OK)   return false;
 
   display_text("Quite el dedo");
   delay(2000);
-  while (finger.getImage() != FINGERPRINT_NOFINGER) ;
+  while (finger.getImage() != FINGERPRINT_NOFINGER) {
+    if (needChange)
+      return false;
+  }
 
   display_text("Vuelva a colocar el dedo");
-  while (finger.getImage() != FINGERPRINT_OK) ;
+  while (finger.getImage() != FINGERPRINT_OK) {
+    if (needChange)
+      return false;
+  }
   // Copia de imagen no creada
   if (finger.image2Tz(2) != FINGERPRINT_OK)    return false;
   // Imagen no almacenada correctamente
@@ -377,8 +390,10 @@ int buscarHuella()
 {
   display_text("Coloque la huella");
 
-  while (finger.getImage() != FINGERPRINT_OK)
-    ;
+  while (finger.getImage() != FINGERPRINT_OK) {
+    if (needChange)
+      return -1;
+  }
   if (finger.image2Tz() != FINGERPRINT_OK)
   return -1;
 
@@ -401,10 +416,10 @@ void stack_push(Registro user)
 }
 
 //  --- Elimina un registro de usuario de la pila ---
-uint8_t stack_pop()
+int stack_pop()
 {
   if (STACK_POS > 0)
-    return STACK_POS--;
+    return --STACK_POS;
   else
     return ST_ERROR;
 }
@@ -431,10 +446,11 @@ uint8_t readnumber(void)
 }
 
 // --- Reduce codigo repetitivo al usar display OLED ---
-void display_text(char* text)
+void display_text(const char* text)
 {
   display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
-  display.println(F(text));
+  display.println(text);
   display.display();
 }
