@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coordinador SABIP</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      /* Paleta de colores principal (Estilo corporativo/transporte) */
+      --primary: #0A2540;     /* Azul oscuro profundo */
+      --primary-light: #1A4B80;
+      --secondary: #6B7280;   /* Gris neutro */
+      --success: #10B981;     /* Verde esmeralda */
+      --danger: #EF4444;      /* Rojo vibrante */
+      --bg-color: #F3F4F6;    /* Fondo gris muy claro */
+      --surface: #FFFFFF;     /* Blanco puro para tarjetas */
+      --text-main: #1F2937;   /* Texto oscuro */
+      --text-muted: #6B7280;  /* Texto secundario */
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* App Bar Superior */
+    .header {
+      background-color: var(--primary);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      margin-bottom: 25px;
+    }
+
+    /* Estilos para el logo de la empresa */
+    .logo-empresa {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+
+    .header h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* Contenedor de Vistas y Animación */
+    .view {
+      display: none;
+      padding: 0 20px 30px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .active-view {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h3 { margin-top: 0; color: var(--primary); font-size: 20px; font-weight: 800; }
+
+    /* Botones Modernos */
+    .btn {
+      background: var(--primary);
+      color: white;
+      padding: 16px 20px;
+      border: none;
+      border-radius: 12px;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 6px rgba(10, 37, 64, 0.15);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: var(--primary-light);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(10, 37, 64, 0.2);
+    }
+    .btn:active { transform: translateY(0); scale: 0.98; }
+
+    .btn-secondary { background: var(--secondary); box-shadow: 0 4px 6px rgba(107, 114, 128, 0.15); }
+    .btn-secondary:hover { background: #4B5563; }
+
+    .btn-danger { background: var(--danger); box-shadow: 0 4px 6px rgba(239, 68, 68, 0.15); }
+    .btn-danger:hover { background: #DC2626; }
+
+    .btn-success { background: var(--success); color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15); }
+    .btn-success:hover { background: #059669; }
+
+    .btn-volver {
+      width: auto;
+      display: inline-block;
+      padding: 10px 16px;
+      font-size: 14px;
+      margin-bottom: 25px;
+      border-radius: 8px;
+    }
+
+    /* Formularios Elegantes */
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--primary-light);
+      font-size: 14px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 14px;
+      border: 1.5px solid #D1D5DB;
+      border-radius: 10px;
+      box-sizing: border-box;
+      font-size: 15px;
+      background-color: var(--surface);
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(10, 37, 64, 0.1);
+    }
+
+    /* Tarjetas de Pasajeros */
+    .card {
+      background: var(--surface);
+      padding: 18px 20px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      border-left: 5px solid var(--primary);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      transform: translateX(4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .user-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .date { font-size: 13px; color: var(--text-muted); margin-top: 8px; font-family: monospace; }
+
+    /* Bloques de Parada (Headers de la lista) */
+    .parada-bloque {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white;
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin-top: 35px;
+      margin-bottom: 15px;
+      font-size: 16px;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(10, 37, 64, 0.2);
+    }
+
+    .sin-pasajeros {
+      background: #E5E7EB;
+      color: var(--text-muted);
+      padding: 16px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      border: 1px dashed #9CA3AF;
+      margin-bottom: 12px;
+    }
+
+    /* Badges de Estado ("Sin abordar" / "✓ Abordó") */
+    .estado {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .sin-abordar {
+      color: #9F1239;
+      background-color: #FFE4E6;
+      border: 1px solid #FECDD3;
+    }
+    .abordo {
+      color: #065F46;
+      background-color: #D1FAE5;
+      border: 1px solid #A7F3D0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="logo.png" alt="Logo Settepi" class="logo-empresa">
+    <h2>Control SABIP</h2>
+  </div>
+
+  <div id="view-login" class="view active-view">
+    <h3>Iniciar Sesión</h3>
+    <div class="form-group">
+        <label>Correo Electrónico:</label>
+        <input type="email" id="input-email" placeholder="usuario@settepi.com">
+    </div>
+    <div class="form-group">
+        <label>Contraseña:</label>
+        <input type="password" id="input-password" placeholder="******">
+    </div>
+    <button id="btn-login" class="btn">Ingresar</button>
+  </div>
+
+  <div id="view-menu" class="view">
+    <p>Bienvenido, <span id="user-role-display"></span></p>
+    <button id="btn-menu-monitorear" class="btn">Monitorear Rutas</button>
+    <button id="btn-menu-rutas" class="btn btn-secondary" style="display: none;">Administrar Rutas</button>
+    <button id="btn-menu-usuarios" class="btn btn-secondary" style="display: none;">Asignar Usuarios</button>
+    <button id="btn-menu-reportes" class="btn btn-secondary" style="display: none;">Reporte de Asistencias</button>
+    <button id="btn-logout" class="btn btn-danger" style="margin-top: 20px;">Cerrar Sesión</button>
+  </div>
+
+  <div id="view-rutas-lista" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
+    <h3>Administrar Rutas</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Selecciona una ruta para administrar sus paradas:</p>
+    <div id="contenedor-rutas-admin">
+        <button class="btn btn-ruta-admin" data-ruta="Ruta 32">Ruta 32</button>
+    </div>
+  </div>
+
+  <div id="view-rutas-form" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-rutas-lista">⬅ Volver a Rutas</button>
+    <h3>Añadir Punto de Parada</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Asignando punto de control a la <strong id="lbl-ruta-actual"></strong></p>
+    <div class="form-group">
+        <label>Nombre de la parada:</label>
+        <input type="text" id="input-nombre-parada" placeholder="Ej. Centro Comercial">
+    </div>
+    <div class="form-group">
+        <label>Dirección física:</label>
+        <input type="text" id="input-direccion-parada" placeholder="Ej. Av. Principal 123">
+    </div>
+    <button id="btn-guardar-parada" class="btn btn-success">Guardar Punto de Parada</button>
+  </div>
+
+  <div id="view-usuarios" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
+    <h3>Registrar Nuevo Pasajero</h3>
+    <div class="form-group">
+        <label>Esperando Huella del Sensor (ID_Usuario):</label>
+        <input type="text" id="input-huella-id" placeholder="ID pendiente..." readonly style="background-color: #e9ecef; border-color: var(--success); border-width: 2px;">
+        <button id="btn-pedir-huella" class="btn btn-secondary" style="margin-top: 10px; padding: 10px; font-size: 14px;">Empezar a escuchar nueva huella</button>
+    </div>
+    <div class="form-group">
+        <label>Nombre Completo:</label>
+        <input type="text" id="input-nombre" placeholder="Ingresa el nombre">
+    </div>
+    <div class="form-group">
+        <label>Número de Nómina / Gafete:</label>
+        <input type="text" id="input-nomina" placeholder="Ej. EMP-12345">
+    </div>
+    <div class="form-group">
+        <label>Ruta:</label>
+        <select id="select-ruta">
+            <option value="">Selecciona una ruta...</option>
+            <option value="Ruta 32">Ruta 32</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Punto de Parada asignado:</label>
+        <select id="select-parada">
+            <option value="">Selecciona primero una ruta</option>
+        </select>
+    </div>
+    <button id="btn-guardar-usuario" class="btn btn-success">Guardar Usuario en Base de Datos</button>
+  </div>
+
+  <div id="view-monitoreo" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
+    <h3>Monitoreo en Tiempo Real</h3>
+    <div id="lista-monitoreo">
+        <p style="color:var(--text-muted); font-size:14px;">Sincronizando con la base de datos...</p>
+    </div>
+  </div>
+
+  <div id="view-reportes" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
+    <h3>Reportes de Asistencia</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Consulta las inasistencias en un periodo (excluye domingos).</p>
+
+    <div class="form-group">
+        <label>Ruta:</label>
+        <select id="select-ruta-reporte">
+            <option value="">Selecciona una ruta...</option>
+            <option value="Ruta 32">Ruta 32</option>
+            <option value="32">32</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Fecha de Inicio:</label>
+        <input type="date" id="input-fecha-inicio">
+    </div>
+    <div class="form-group">
+        <label>Fecha de Fin:</label>
+        <input type="date" id="input-fecha-fin">
+    </div>
+    <button id="btn-generar-reporte" class="btn btn-success">Generar Reporte</button>
+
+    <div id="lista-reportes" style="margin-top: 20px;">
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

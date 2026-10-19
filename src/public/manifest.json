@@ -1,0 +1,20 @@
+{
+  "name": "Coordinador SABIP",
+  "short_name": "SABIP",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#0056b3",
+  "icons": [
+    {
+      "src": "icono-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icono-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

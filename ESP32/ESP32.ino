@@ -8,7 +8,7 @@
 #include <HardwareSerial.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_Fingerprint.h>
- 
+
 // --- Componentes ---
 RTC_DS1307 rtc;
 
@@ -22,22 +22,20 @@ HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 // --- Pines ---
-#define RED_PIN 2
-// #define BUZZER_PIN 4
+#define    RED_PIN 2
+#define SIGNAL_PIN 4
 
 // --- MACROS auxiliares para la pila ---
-#define STACK_SIZE 32
+#define STACK_SIZE 48
 #define ST_ERROR   -1
 
-const uint8_t route = 32;
-
 // --- Configuración WiFi / HTTP ---
-// El SSID varia (obviamente)
 const char* ssid = "INFINITUMB9B8";
-// La contraseña tambien
 const char* password = "g53kZGU5pS";
-// Esta tambien
-const char* serverUrl = "http://192.168.1.76:8080"; // Cambia por tu servidor/endpoint
+// Para el servidor puede variar la ip, pero el puerto siempre es el mismo
+// El puerto para escuchar peticiones esta definido como 8080
+// serverUrl = http://X.X.X.X:8080
+const char* serverUrl = "http://192.168.1.76:8080";
 
 // --- Estructura para almacenar registros de usuario  ---
 struct Registro {
@@ -49,16 +47,30 @@ struct Registro {
 Registro USER_STACK[STACK_SIZE] = {};
 int STACK_POS = 0;
 
+// --- variables globales y definiciones auxiliares ---
+const String route = "Ruta_32";
 char bufferFecha[25];
-uint8_t choice;
+
+enum SysMode {
+  REGISTER,
+  NEW_USER
+};
+
+SysMode mode = REGISTER;
+volatile bool needChange = false;
+
+void IRAM_ATTR detectSignal() {
+  needChange = true;
+}
+
 
 void setup() {
   Serial.begin(9600);
-
   pinMode(RED_PIN, OUTPUT);
-  // pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(SIGNAL_PIN, INPUT_PULLUP);
   digitalWrite(RED_PIN, LOW);
-  // digitalWrite(BUZZER_PIN, LOW);
+
+  attachInterrupt(digitalPinToInterrupt(SIGNAL_PIN), detectSignal, FALLING);
 
   // Inicializar pantalla OLED
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -66,86 +78,90 @@ void setup() {
     for (;;)
       ;
   }
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
 
   // Inicializar lector de huellas
   mySerial.begin(57600, SERIAL_8N1, 16, 17);
   finger.begin(57600);
 
   if (!finger.verifyPassword()) {
-    display.println(F("Error sensor huella :c"));
-    display.display();
+    display_text("Error sensor huella :c");
     for (;;)
       ;
   }
 
-  // if (finger.emptyDatabase() != FINGERPRINT_OK) Serial.println("Error al formatear sensor");
+  // Codigo para restaurar base de datos del sensor
+  // Usar con precaucion
+
+  /*
+    if (finger.emptyDatabase() != FINGERPRINT_OK)
+      Serial.println("Error al formatear sensor");
+  */
 
   // Inicializar RTC DS1307
   if (!rtc.begin()) {
-    display.println(F("Error: DS3231 module not found"));
-    display.display();
+    display_text("Error: DS3231 module not found");
     for (;;)
       ;
   } else if (!rtc.isrunning()) {
-    display.println(F("RTC sad, idk..."));
-    display.display();
+    display_text("RTC sad, idk");
     delay(5000);
     // Ajusta el RTC a la fecha y hora de compilación
-    // Actualizando 
   }
 
-  // Descomentar si se desajusta el reloj 
-  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  // DateTime now = rtc.now();
-  // ajustar los segundos entre la compilacion y la escritura del codigo
-  // uint8_t adjust_second = now.second() + 14;
-  // uint8_t adjust_minute = now.minute();
-  // if (adjust_second > 59) {
-  //   adjust_second = adjust_second % 60;
-  //   adjust_minute++;
-  // }
-  // rtc.adjust(DateTime(
-  //   now.year(), now.month(), now.day(),
-  //   now.hour(), adjust_minute, adjust_second
-  // ));
+  // Codigo para ajustar los segundos entre
+  // la compilacion y la escritura del codigo (compensar el desajuste del reloj)
+  // no pregunte por el 14...
 
-  display.clearDisplay();
+  /*
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  DateTime now = rtc.now();
+  uint8_t adjust_second = now.second() + 14;
+  uint8_t adjust_minute = now.minute();
+  if (adjust_second > 59) {
+    adjust_second = adjust_second % 60;
+    adjust_minute++;
+  }
+  rtc.adjust(DateTime(
+    now.year(), now.month(), now.day(),
+    now.hour(), adjust_minute, adjust_second
+  ));
+  */
+
   // Intento opcional de conexión WiFi
   WiFi.begin(ssid, password);
 
-  display.println(F("Ingrese tipo registro"));
-  display.println(F("1. De usuario"));
-  display.println(F("2. De asistencia"));
-  display.display();
-  choice = readnumber();
+  // Modo predeterminado del sistema (registro de usuarios)
+  display_text("Modo inicial: lectura\n\nPresione boton para registrar usuario");
+  delay(3000);
 }
 
 void loop() {
-
-  switch(choice) {
-    case 1: {
-      newUser();
-      break;
-    }
-    case 2: {
-      leer_serial();
-      break;
-    }
-    default: {
-      display.clearDisplay();
-      display.println(F("Opcion no valida :c"));
-      display.display();
-      delay(5000);
-      break;
-    }
+  switch (mode) {
+    case REGISTER: {leer_serial(); break;}
+    case NEW_USER: {    newUser(); break;}
   }
-  
+
+  if (needChange) {
+    delay(50);
+    if (digitalRead(SIGNAL_PIN) == LOW)
+      nextMode();
+    
+    needChange = false;
+  }
 }
 
-void newUser() {
+// --- intercambia el modo actual del sistema ---
+void nextMode()
+{
+  if (mode == REGISTER)
+    mode = NEW_USER;
+  else if (mode == NEW_USER)
+    mode = REGISTER;
+}
+
+// --- Registro de datos para nuevo usuario ---
+void newUser()
+{
   int id = buscarIndice();
   if (id == -1)
     return;
@@ -153,93 +169,59 @@ void newUser() {
   if (!registrarHuella(id))
     return;
 
-    while (Serial.available())
-      Serial.read();
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println(F("ID capturado"));
-  display.println(F("Ingrese nombre de usuario:"));
-  display.display();
-
-  while (!Serial.available())
-    ;
-  String username = Serial.readStringUntil('\n');
-  username.trim();
-
-  if (username.length() == 0) {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("Nombre invalido");
-    display.display();
-    delay(3000);
-    return;
-  }
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println(F("Se inicio el proceso de registro"));
-  display.display();
-
-  crearUsuarioHTTP(String(id), String(route), username);
+  display_text("ID capturado");
+  delay(1000);
+  crearUsuarioHTTP(String(id));
 }
 
-void crearUsuarioHTTP(String bio_id, String route, String name) {
+// --- Generacion de usuario mediante HTTP POST ---
+void crearUsuarioHTTP(String bio_id)
+{
   if (WiFi.status() != WL_CONNECTED) {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("Error: no WiFi"));
-    display.display();
+    display_text("Error: no WiFi");
     delay(3000);
     return;
   }
   HTTPClient http;
-  String url = String(serverUrl) + "/api/users";
+  String url = String(serverUrl) + "/api/enroll";
   http.begin(url);
   http.addHeader("content-Type", "application/json");
 
   JsonDocument doc;
   doc["biometric_id"] = bio_id;
-  doc["route"] = route;
-  doc["name"] = name;
 
   String jsonPayload;
   serializeJson(doc, jsonPayload);
   int httpCode = http.POST(jsonPayload);
 
-  display.clearDisplay();
-  display.setCursor(0, 0);
-
   if (httpCode == 201) {
-    display.println("Usuario registrado con exito");
+    display_text("Huella enviada a\nvinculacion");
+    activarAlarma();
   } else {
     Serial.printf("Error HTTP: %d", httpCode);
-    display.println(F("Usuario NO registrado"));
+    display_text("Error de vinculacion");
   }
-  display.display();
   delay(3000);
   http.end();
 }
 
-// Leer del puerto serial si hay datos disponibles
-void leer_serial(void) {
+// --- Obtencion de datos mediante puerto Serial ---
+void leer_serial(void)
+{
   int id_encontrado = buscarHuella();
 
   if (id_encontrado == -1) {
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.println(F("Huella no reconocida"));
-    display.display();
+    display_text("Huella invalida\nIntente de nuevo...");
     delay(2000);
     return;
   }
 
-  process_log(String(id_encontrado)); 
+  process_log(String(id_encontrado));
 }
 
-// --- Procesamiento de los datos ---
-void process_log(String codigo) {
-
+// --- Procesamiento de asistencias de usuario / creacion de log ---
+void process_log(String codigo)
+{
   String user_id = codigo;
 
   DateTime ahora = rtc.now();
@@ -261,7 +243,8 @@ void process_log(String codigo) {
 }
 
 // --- Envío de Datos por HTTP POST ---
-void enviarPeticionHTTP(Registro user) {
+void enviarPeticionHTTP(Registro user)
+{
   HTTPClient http;
   String api_endpoint = String(serverUrl) + "/api/log";
   http.begin(api_endpoint);
@@ -270,6 +253,7 @@ void enviarPeticionHTTP(Registro user) {
   JsonDocument doc;
   String jsonPayload;
   bool isbatch = false;
+  int stack_start = STACK_POS;
   int load = 0;
 
   if (STACK_POS > 0) {
@@ -316,9 +300,14 @@ void enviarPeticionHTTP(Registro user) {
       display.println(user_name);
     }
   } else {
-    display.clearDisplay();
     Serial.printf("Error HTTP: %s:\n", http.errorToString(httpCode).c_str());
     display.println("Error con el servidor");
+    display.println("Registro almacenado en stack");
+    // revertir stack_pop realizados actualizando el indice
+    STACK_POS = stack_start;
+    // subir usuario al stack
+    stack_push(user);
+
   }
 
   display.display();
@@ -326,9 +315,7 @@ void enviarPeticionHTTP(Registro user) {
   http.end();
 }
 
-
-// Envia una peticion http get para obtener el nombre de un usuario 
-// a partir de su id (no biometrico)
+// --- Obtencion de nombre de usuario por HTTP GET ---
 String obtener_username(String biometric_id)
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -338,7 +325,7 @@ String obtener_username(String biometric_id)
   String url = String(serverUrl) + "/api/users/id/" + biometric_id;
   http.begin(url);
 
-  int httpCode =http.GET();
+  int httpCode = http.GET();
   String name = "NULL";
 
   if (httpCode == HTTP_CODE_OK || httpCode == 404)
@@ -350,8 +337,9 @@ String obtener_username(String biometric_id)
   return name;
 }
 
-// Busca el primer indice vacio de memoria dentro del lector de huellas
-int buscarIndice() {
+// --- Busqueda de espacio disponible en sensor ---
+int buscarIndice()
+{
   finger.getTemplateCount();
 
   if (finger.templateCount >= 127)
@@ -360,52 +348,40 @@ int buscarIndice() {
   return finger.templateCount + 1;
 }
 
+// --- Creacion de imagen de huella (sensor) ---
+bool registrarHuella(int id)
+{
+  display_text("Coloque el dedo");
+  while (finger.getImage() != FINGERPRINT_OK) ;
+  // Imagen no creada
+  if (finger.image2Tz(1) != FINGERPRINT_OK)   return false;
 
-// Registra una huella dentro de la memoria del lector de huellas
-bool registrarHuella(int id) {
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Coloque el dedo"));
-  display.display();
-
-  while (finger.getImage() != FINGERPRINT_OK)
-    ;
-  if (finger.image2Tz(1) != FINGERPRINT_OK) return false;
-
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Quite el dedo"));
-  display.display();
+  display_text("Quite el dedo");
   delay(2000);
-  while (finger.getImage() != FINGERPRINT_NOFINGER)
-    ;
+  while (finger.getImage() != FINGERPRINT_NOFINGER) ;
 
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Coloque el mismo dedo"));
-  display.display();
-
-  while (finger.getImage() != FINGERPRINT_OK)
-    ;
-  if (finger.image2Tz(2) != FINGERPRINT_OK) return false;
+  display_text("Vuelva a colocar el dedo");
+  while (finger.getImage() != FINGERPRINT_OK) ;
+  // Copia de imagen no creada
+  if (finger.image2Tz(2) != FINGERPRINT_OK)    return false;
+  // Imagen no almacenada correctamente
   if (finger.storeModel(id) != FINGERPRINT_OK) return false;
 
+  // Imagen creada y almacenada con exito
   return true;
 }
 
-// Busca una huella coincidente dentro de la memoria del lector de huellas
-// A partir de una huella recien capturada
-int buscarHuella() {
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(F("Coloque la huella"));
-  display.display();
+
+// --- Busqueda de huella en memoria (sensor) ---
+int buscarHuella()
+{
+  display_text("Coloque la huella");
 
   while (finger.getImage() != FINGERPRINT_OK)
     ;
-  if (finger.image2Tz() != FINGERPRINT_OK) 
+  if (finger.image2Tz() != FINGERPRINT_OK)
   return -1;
-  
+
   if (finger.fingerSearch() == FINGERPRINT_OK)
     return finger.fingerID;
 
@@ -419,13 +395,9 @@ void stack_push(Registro user)
     activarAlarma();
     USER_STACK[STACK_POS++] = user;
     Serial.println("Registro almacenado en la pila. Conexion a Internet no disponible");
-    // Serial.printf("%2d %s %s\n", (STACK_POS-1), USER_STACK[STACK_POS-1].biometric, USER_STACK[STACK_POS-1].fecha
   }
-  else {
+  else
     Serial.println("Registro no realizado. Pila de usuarios llena");
-    activarAlarma();
-    activarAlarma();
-  }
 }
 
 //  --- Elimina un registro de usuario de la pila ---
@@ -435,18 +407,19 @@ uint8_t stack_pop()
     return STACK_POS--;
   else
     return ST_ERROR;
-} 
-
-// --- Acción sobre LED y Buzzer ---
-void activarAlarma() {
-  digitalWrite(RED_PIN, HIGH);
-  // digitalWrite(BUZZER_PIN, HIGH);
-  delay(500); // Mantiene encendido por 1 segundo
-  digitalWrite(RED_PIN, LOW);
-  // digitalWrite(BUZZER_PIN, LOW);
 }
 
-uint8_t readnumber(void) {
+// --- Acción sobre LED y Buzzer ---
+void activarAlarma()
+{
+  digitalWrite(RED_PIN, HIGH);
+  delay(500); // Mantiene encendido por 500 ms
+  digitalWrite(RED_PIN, LOW);
+}
+
+// --- Obtencion de numeros mediante puerto serial ---
+uint8_t readnumber(void)
+{
   uint8_t num = 0;
 
   while (num == 0) {
@@ -455,4 +428,13 @@ uint8_t readnumber(void) {
     num = Serial.parseInt();
   }
   return num;
+}
+
+// --- Reduce codigo repetitivo al usar display OLED ---
+void display_text(char* text)
+{
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println(F(text));
+  display.display();
 }
