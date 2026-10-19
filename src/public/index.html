@@ -97,6 +97,7 @@
       box-shadow: 0 6px 12px rgba(10, 37, 64, 0.2);
     }
     .btn:active { transform: translateY(0); scale: 0.98; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
     .btn-secondary { background: var(--secondary); box-shadow: 0 4px 6px rgba(107, 114, 128, 0.15); }
     .btn-secondary:hover { background: #4B5563; }
@@ -179,6 +180,44 @@
       box-shadow: 0 4px 10px rgba(10, 37, 64, 0.2);
     }
 
+    /* Dirección de la parada, debajo del nombre y dentro del mismo bloque */
+    .parada-direccion {
+      font-size: 13px;
+      font-weight: 400;
+      opacity: 0.85;
+      margin-top: 6px;
+    }
+
+    /* Dirección de la parada seleccionada (formulario de asignar usuarios) */
+    .direccion-seleccionada {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Dirección dentro de la tarjeta de una parada (administrar rutas) */
+    .parada-card-direccion {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Botón pequeño para eliminar una parada desde su tarjeta */
+    .btn-eliminar-parada {
+      background: var(--danger);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+    .btn-eliminar-parada:hover { background: #DC2626; }
+    .btn-eliminar-parada:disabled { opacity: 0.6; cursor: not-allowed; }
+
     .sin-pasajeros {
       background: #E5E7EB;
       color: var(--text-muted);
@@ -209,6 +248,25 @@
       background-color: #D1FAE5;
       border: 1px solid #A7F3D0;
     }
+
+    /* Separador de secciones dentro de una vista */
+    .seccion-titulo {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin: 22px 0 12px;
+    }
+
+    /* Mensaje de resultado (por ejemplo, al intentar eliminar una ruta) */
+    .aviso-error {
+      background: #FEF2F2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.45;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -217,6 +275,7 @@
     <h2>Control SABIP</h2>
   </div>
 
+  <!-- LOGIN -->
   <div id="view-login" class="view active-view">
     <h3>Iniciar Sesión</h3>
     <div class="form-group">
@@ -230,6 +289,7 @@
     <button id="btn-login" class="btn">Ingresar</button>
   </div>
 
+  <!-- MENÚ PRINCIPAL -->
   <div id="view-menu" class="view">
     <p>Bienvenido, <span id="user-role-display"></span></p>
     <button id="btn-menu-monitorear" class="btn">Monitorear Rutas</button>
@@ -239,17 +299,57 @@
     <button id="btn-logout" class="btn btn-danger" style="margin-top: 20px;">Cerrar Sesión</button>
   </div>
 
+  <!-- ADMINISTRAR RUTAS: lista + añadir + eliminar -->
   <div id="view-rutas-lista" class="view">
     <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
     <h3>Administrar Rutas</h3>
-    <p style="color:var(--text-muted); font-size:14px;">Selecciona una ruta para administrar sus paradas:</p>
-    <div id="contenedor-rutas-admin">
-        <button class="btn btn-ruta-admin" data-ruta="Ruta 32">Ruta 32</button>
+
+    <button id="btn-ruta-anadir" class="btn btn-success">➕ Añadir ruta</button>
+    <button id="btn-ruta-eliminar" class="btn btn-danger">🗑 Eliminar ruta</button>
+
+    <p class="seccion-titulo">Selecciona una ruta para administrar sus paradas:</p>
+    <div id="contenedor-rutas-admin"></div>
+  </div>
+
+  <div id="view-ruta-nueva" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-rutas-lista">⬅ Volver a Rutas</button>
+    <h3>Añadir Ruta</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Escribe el nombre de la nueva ruta. Las paradas se agregan después desde Administrar Rutas.</p>
+    <div class="form-group">
+        <label>Nombre de la ruta:</label>
+        <input type="text" id="input-nombre-ruta" placeholder="Ej. Ruta 45" maxlength="40">
     </div>
+    <button id="btn-guardar-ruta" class="btn btn-success">Guardar Ruta</button>
+  </div>
+
+  <div id="view-ruta-eliminar" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-rutas-lista">⬅ Volver a Rutas</button>
+    <h3>Eliminar Ruta</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Solo se puede eliminar una ruta que no tenga abordajes registrados en las últimas 2 semanas.</p>
+    <div class="form-group">
+        <label>Ruta a eliminar:</label>
+        <select id="select-ruta-eliminar">
+            <option value="">Selecciona una ruta...</option>
+        </select>
+    </div>
+    <button id="btn-confirmar-eliminar-ruta" class="btn btn-danger">Eliminar Ruta</button>
+    <div id="resultado-eliminar-ruta"></div>
+  </div>
+
+  <!-- DETALLE DE RUTA: paradas registradas + añadir + eliminar -->
+  <div id="view-ruta-detalle" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-rutas-lista">⬅ Volver a Rutas</button>
+    <h3 id="titulo-ruta-detalle">Paradas</h3>
+
+    <button id="btn-parada-anadir" class="btn btn-success">➕ Añadir parada</button>
+    <button id="btn-parada-eliminar" class="btn btn-danger">🗑 Eliminar paradas</button>
+
+    <p class="seccion-titulo">Paradas registradas:</p>
+    <div id="lista-paradas-admin"></div>
   </div>
 
   <div id="view-rutas-form" class="view">
-    <button class="btn btn-secondary btn-volver" data-target="view-rutas-lista">⬅ Volver a Rutas</button>
+    <button class="btn btn-secondary btn-volver" data-target="view-ruta-detalle">⬅ Volver a la Ruta</button>
     <h3>Añadir Punto de Parada</h3>
     <p style="color:var(--text-muted); font-size:14px;">Asignando punto de control a la <strong id="lbl-ruta-actual"></strong></p>
     <div class="form-group">
@@ -263,6 +363,7 @@
     <button id="btn-guardar-parada" class="btn btn-success">Guardar Punto de Parada</button>
   </div>
 
+  <!-- ASIGNAR USUARIOS -->
   <div id="view-usuarios" class="view">
     <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
     <h3>Registrar Nuevo Pasajero</h3>
@@ -283,7 +384,6 @@
         <label>Ruta:</label>
         <select id="select-ruta">
             <option value="">Selecciona una ruta...</option>
-            <option value="Ruta 32">Ruta 32</option>
         </select>
     </div>
     <div class="form-group">
@@ -291,18 +391,29 @@
         <select id="select-parada">
             <option value="">Selecciona primero una ruta</option>
         </select>
+        <div id="direccion-parada-seleccionada" class="direccion-seleccionada"></div>
     </div>
     <button id="btn-guardar-usuario" class="btn btn-success">Guardar Usuario en Base de Datos</button>
   </div>
 
-  <div id="view-monitoreo" class="view">
+  <!-- MONITOREO: primero se elige la ruta, luego se muestra el monitoreo -->
+  <div id="view-monitoreo-seleccion" class="view">
     <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
-    <h3>Monitoreo en Tiempo Real</h3>
+    <h3>Monitorear Rutas</h3>
+    <p style="color:var(--text-muted); font-size:14px;">Selecciona la ruta que quieres monitorear:</p>
+    <div id="contenedor-rutas-monitoreo"></div>
+  </div>
+
+  <div id="view-monitoreo" class="view">
+    <button class="btn btn-secondary btn-volver" data-target="view-monitoreo-seleccion">⬅ Volver a Rutas</button>
+    <h3 id="titulo-monitoreo">Monitoreo en Tiempo Real</h3>
+    <p id="subtitulo-monitoreo" style="color:var(--text-muted); font-size:14px; margin-top:-8px;"></p>
     <div id="lista-monitoreo">
         <p style="color:var(--text-muted); font-size:14px;">Sincronizando con la base de datos...</p>
     </div>
   </div>
 
+  <!-- REPORTES -->
   <div id="view-reportes" class="view">
     <button class="btn btn-secondary btn-volver" data-target="view-menu">⬅ Volver al Menú</button>
     <h3>Reportes de Asistencia</h3>
@@ -312,8 +423,6 @@
         <label>Ruta:</label>
         <select id="select-ruta-reporte">
             <option value="">Selecciona una ruta...</option>
-            <option value="Ruta 32">Ruta 32</option>
-            <option value="32">32</option>
         </select>
     </div>
     <div class="form-group">
